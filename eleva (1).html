@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>✦ Eleva</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: #F7F6FF; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-thumb { background: #C5BFFF; border-radius: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    input, textarea, select { font-family: 'Plus Jakarta Sans', sans-serif; }
+    input[type="date"] { color-scheme: light; }
+    .del-btn { color: #DDD; transition: color 0.15s; }
+    .del-btn:hover { color: #F06449; }
+    .task-row:hover { background: #FDFCFF; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // ── Lucide icons inline ──────────────────────────────────────────
+    const ChevronLeft    = ({size=16,color="currentColor"}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15,18 9,12 15,6"/></svg>
+    const ChevronRight   = ({size=16,color="currentColor"}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9,18 15,12 9,6"/></svg>
+    const Trash2         = ({size=16,color="currentColor"}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1 2-2h4a2,2 0 0,1 2,2v2"/></svg>
+    const Plus           = ({size=16,color="currentColor"}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    const X              = ({size=16,color="currentColor"}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    const Check          = ({size=16,color="currentColor",strokeWidth=2}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"><polyline points="20,6 9,17 4,12"/></svg>
+    const ChevronsUpDown = ({size=16,color="currentColor"}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="7,15 12,20 17,15"/><polyline points="7,9 12,4 17,9"/></svg>
+
+    // ── App ──────────────────────────────────────────────────────────
+
+const CATS = [
+  { name:"Trabalho", color:"#6155E8", bg:"#EEEDFE" },
+  { name:"Saúde",    color:"#22B37F", bg:"#E1F5EE" },
+  { name:"Casa",     color:"#F06449", bg:"#FAECE7" },
+  { name:"Finanças", color:"#D48B10", bg:"#FEF3DC" },
+  { name:"Pessoal",  color:"#C44F7A", bg:"#FDF0F5" },
+  { name:"Outros",   color:"#8B8FA8", bg:"#F3F4F8" },
+];
+const STATUSES = [
+  { id:"nao_iniciado", label:"Não iniciado", dot:"#C8C8D8" },
+  { id:"em_andamento",  label:"Em andamento",  dot:"#D48B10" },
+  { id:"feito",         label:"Feito!",         dot:"#22B37F" },
+];
+const PRIOS = [
+  { id:"alta",  label:"Alta",  color:"#F06449" },
+  { id:"media", label:"Média", color:"#D48B10" },
+  { id:"baixa", label:"Baixa", color:"#22B37F" },
+];
+const DAY_SHORT  = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+const MONTHS     = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const TABS       = ["Diário","Semana","Mês","Kanban","Lista completa"];
+const NAV_ITEMS  = [
+  { id:"home",    label:"Home",    icon:"🏠", active:false, soon:false },
+  { id:"metas",   label:"Metas",   icon:"🎯", active:false, soon:true  },
+  { id:"habitos", label:"Hábitos", icon:"🔄", active:false, soon:true  },
+  { id:"tarefas", label:"Tarefas", icon:"📋", active:true,  soon:false },
+];
+
+const INIT_TASKS = [
+  {id:1, title:"Revisão semanal",               status:"nao_iniciado", date:"2026-05-31", dateEnd:"", category:"Trabalho", priority:"alta",  tags:[],           link:""},
+  {id:2, title:"Ligar para a família",           status:"nao_iniciado", date:"2026-05-31", dateEnd:"", category:"Pessoal",  priority:"media", tags:[],           link:""},
+  {id:3, title:"Pilates",                        status:"feito",        date:"2026-05-31", dateEnd:"", category:"Saúde",    priority:"media", tags:[],           link:""},
+  {id:4, title:"Atualizar weekly",               status:"nao_iniciado", date:"2026-05-31", dateEnd:"", category:"Trabalho", priority:"baixa", tags:[],           link:""},
+  {id:5, title:"Ler 30 minutos",                 status:"nao_iniciado", date:"2026-05-31", dateEnd:"", category:"Pessoal",  priority:"baixa", tags:[],           link:""},
+  {id:6, title:"Atualizar NCT semana passada",   status:"feito",        date:"2026-06-01", dateEnd:"", category:"Trabalho", priority:"alta",  tags:[],           link:""},
+  {id:7, title:"Fazer doc resultados de maio",   status:"feito",        date:"2026-06-02", dateEnd:"", category:"Trabalho", priority:"alta",  tags:[],           link:""},
+  {id:8, title:"1:1 GE",                         status:"nao_iniciado", date:"2026-06-03", dateEnd:"", category:"Trabalho", priority:"media", tags:[],           link:""},
+  {id:9, title:"Voltar para a terapia",          status:"nao_iniciado", date:"2026-06-10", dateEnd:"", category:"Saúde",    priority:"alta",  tags:["meta 2026"],link:""},
+  {id:10,title:"Pagar fatura do cartão",         status:"nao_iniciado", date:"2026-06-10", dateEnd:"", category:"Finanças", priority:"alta",  tags:[],           link:""},
+  {id:11,title:"Ir no dentista",                 status:"nao_iniciado", date:"2026-06-12", dateEnd:"", category:"Saúde",    priority:"alta",  tags:[],           link:""},
+  {id:12,title:"Arrumar vazamento do banheiro",  status:"nao_iniciado", date:"2026-06-15", dateEnd:"", category:"Casa",     priority:"alta",  tags:[],           link:""},
+  {id:13,title:"Terminar curso Product Leadership",status:"em_andamento",date:"2026-06-20",dateEnd:"", category:"Trabalho", priority:"media", tags:["meta 2026"],link:""},
+];
+
+function getWeekDays(anchor) {
+  const d   = new Date(anchor);
+  const dow = d.getDay();
+  const off = dow === 0 ? -6 : 1 - dow;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + off);
+  return Array.from({length:7}, (_,i) => {
+    const dd = new Date(mon);
+    dd.setDate(mon.getDate() + i);
+    return dd;
+  });
+}
+function toStr(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+}
+
+const getCat = (n) => CATS.find(c => c.name === n) || CATS[5];
+const P       = "#6155E8";
+const TODAY   = new Date(2026, 4, 31);
+const TODAY_S = "2026-05-31";
+
+function Eleva() {
+  const [tasks,    setTasks]    = useState(INIT_TASKS);
+  const [tab,      setTab]      = useState("Diário");
+  const [selDate,  setSelDate]  = useState(TODAY);
+  const [wAnchor,  setWAnchor]  = useState(TODAY);
+  const [prios,    setPrios]    = useState({ [TODAY_S]: ["","",""] });
+  const [priosDone,setPriosDone]= useState({});
+  const [wkPrios,  setWkPrios]  = useState({});
+  const [wkPriosDone,setWkPriosDone] = useState({});
+  const [et,       setEt]       = useState(null);
+  const [isNew,    setIsNew]    = useState(false);
+  const [showAdd,  setShowAdd]  = useState(false);
+  const [addTitle, setAddTitle] = useState("");
+  const [sortRules, setSortRules] = useState([]);
+  const [showSort,  setShowSort]  = useState(false);
+
+  const selStr   = toStr(selDate);
+  const weekDays = useMemo(() => getWeekDays(wAnchor), [wAnchor]);
+
+  const sorted = useMemo(() => {
+    const catIdx  = (t) => CATS.findIndex(c => c.name === t.category);
+    const prioIdx = (t) => PRIOS.findIndex(p => p.id === t.priority);
+    const sortFn  = (a, b) => {
+      for (const rule of sortRules) {
+        let diff = rule.field === "category" ? catIdx(a) - catIdx(b) : prioIdx(a) - prioIdx(b);
+        if (rule.dir === "desc") diff = -diff;
+        if (diff !== 0) return diff;
+      }
+      return 0;
+    };
+    const pending = [...tasks.filter(t => t.date === selStr && t.status !== "feito")].sort(sortFn);
+    const done    = [...tasks.filter(t => t.status === "feito" && (t.dateEnd || t.date) === selStr)].sort(sortFn);
+    return { pending, done, pendingCount: pending.length, total: pending.length + done.length };
+  }, [tasks, selStr, sortRules]);
+
+  const dayPrios = prios[selStr] || ["","",""];
+
+  function prevWeek() {
+    const d = new Date(wAnchor); d.setDate(d.getDate()-7);
+    setWAnchor(d); setSelDate(getWeekDays(d)[0]);
+  }
+  function nextWeek() {
+    const d = new Date(wAnchor); d.setDate(d.getDate()+7);
+    setWAnchor(d); setSelDate(getWeekDays(d)[0]);
+  }
+  function pickDay(d) { setSelDate(d); setWAnchor(d); }
+
+  function setPrio(i, val) {
+    const cur = prios[selStr] || ["","",""];
+    const upd = [...cur]; upd[i] = val;
+    setPrios({ ...prios, [selStr]: upd });
+  }
+
+  function togglePrioDone(i) {
+    const cur = priosDone[selStr] || [false,false,false];
+    const upd = [...cur]; upd[i] = !upd[i];
+    setPriosDone({ ...priosDone, [selStr]: upd });
+  }
+
+  function setWkPrio(wkKey, i, val) {
+    const cur = wkPrios[wkKey] || ["","",""];
+    const upd = [...cur]; upd[i] = val;
+    setWkPrios({ ...wkPrios, [wkKey]: upd });
+  }
+  function toggleWkPrioDone(wkKey, i) {
+    const cur = wkPriosDone[wkKey] || [false,false,false];
+    const upd = [...cur]; upd[i] = !upd[i];
+    setWkPriosDone({ ...wkPriosDone, [wkKey]: upd });
+  }
+
+  function toggleDone(id) {
+    setTasks(p => p.map(t => {
+      if (t.id !== id) return t;
+      const markingDone = t.status !== "feito";
+      return { ...t, status: markingDone ? "feito" : "nao_iniciado", dateEnd: markingDone ? TODAY_S : "" };
+    }));
+  }
+  function delTask(id)  { setTasks(p => p.filter(t => t.id !== id)); }
+
+  function addTask() {
+    if (!addTitle.trim()) return;
+    setTasks(p => [...p, { id:Date.now(), title:addTitle.trim(), status:"nao_iniciado", date:selStr, dateEnd:"", category:"Trabalho", priority:"media", tags:[], link:"" }]);
+    setAddTitle(""); setShowAdd(false);
+  }
+
+  function openTask(t)  { setEt({...t}); setIsNew(false); }
+  function newTaskModal(){ setEt({id:null,title:"",status:"nao_iniciado",date:selStr,dateEnd:"",category:"Trabalho",priority:"media",tags:[],link:""}); setIsNew(true); }
+  function closeM()     { setEt(null); setIsNew(false); }
+  function saveTask()   {
+    if (!et?.title?.trim()) return;
+    if (isNew) setTasks(p => [...p, {...et, id:Date.now()}]);
+    else       setTasks(p => p.map(t => t.id===et.id ? et : t));
+    closeM();
+  }
+  function delModal()   { setTasks(p => p.filter(t => t.id!==et.id)); closeM(); }
+
+  const dateLabel    = `${selDate.getDate()} de ${MONTHS[selDate.getMonth()]} de ${selDate.getFullYear()}`;
+  const pendingCount = sorted.pendingCount;
+
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0;}
+        ::-webkit-scrollbar{width:4px;}
+        ::-webkit-scrollbar-thumb{background:#C5BFFF;border-radius:4px;}
+        input,textarea{font-family:'Plus Jakarta Sans',sans-serif;}
+        input[type=date]{color-scheme:light;}
+        .del-btn{color:#DDD;} .del-btn:hover{color:#F06449;}
+        .task-row:hover{background:#FDFCFF;}
+      `}</style>
+
+      <div style={{display:"flex",height:"100vh",fontFamily:"'Plus Jakarta Sans',sans-serif",background:"#F7F6FF",position:"relative",overflow:"hidden"}}>
+
+        {/* ── SIDEBAR ── */}
+        <aside style={{width:196,flexShrink:0,background:"white",borderRight:"1px solid #ECEAFB",display:"flex",flexDirection:"column",padding:"20px 0"}}>
+          <div style={{padding:"0 16px 18px",borderBottom:"1px solid #F0EEFF",marginBottom:12}}>
+            <div style={{fontSize:22,fontWeight:700,color:P,letterSpacing:"-0.5px"}}>✦ eleva</div>
+            <div style={{fontSize:10,color:"#C0BAFF",fontWeight:600,letterSpacing:"0.8px",textTransform:"uppercase",marginTop:2}}>seu espaço pessoal</div>
+          </div>
+          {NAV_ITEMS.map(n=>(
+            <div key={n.id} style={{display:"flex",alignItems:"center",gap:9,padding:"10px 10px 10px 16px",borderRadius:"0 10px 10px 0",marginRight:10,marginBottom:2,background:n.active?"#F0EEFF":"transparent",color:n.active?P:"#AAA",fontWeight:n.active?600:400,fontSize:13,cursor:"pointer"}}>
+              <span style={{fontSize:15}}>{n.icon}</span>
+              <span style={{flex:1}}>{n.label}</span>
+              {n.soon&&<span style={{fontSize:9,background:"#F0EEFF",color:"#C0BAFF",padding:"2px 5px",borderRadius:4,fontWeight:700}}>BREVE</span>}
+            </div>
+          ))}
+        </aside>
+
+        {/* ── MAIN ── */}
+        <main style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
+
+          {/* header + tabs */}
+          <div style={{padding:"20px 28px 0",flexShrink:0,background:"white",borderBottom:"1px solid #F0EEFF"}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#C0BAFF",letterSpacing:"1.2px",textTransform:"uppercase",marginBottom:10}}>TAREFAS</div>
+            <div style={{display:"flex",gap:0}}>
+              {TABS.map(t=>(
+                <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 16px",fontSize:13,fontWeight:tab===t?700:400,color:tab===t?P:"#CCC",background:"none",border:"none",cursor:"pointer",borderBottom:tab===t?`2px solid ${P}`:"2px solid transparent",marginBottom:"-1px",transition:"all 0.15s"}}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── DIÁRIO ── */}
+          {tab==="Diário" && (
+            <div style={{flex:1,overflowY:"auto",padding:"20px 28px",display:"flex",flexDirection:"column",gap:16}}>
+
+              {/* week strip */}
+              <div style={{display:"flex",alignItems:"center",background:"white",borderRadius:14,padding:"10px 14px",border:"1px solid #F0EEFF",gap:4}}>
+                <button onClick={prevWeek} style={{width:28,height:28,borderRadius:8,border:"none",background:"#F0EEFF",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:P,flexShrink:0}}>
+                  <ChevronLeft size={14}/>
+                </button>
+                <div style={{flex:1,display:"flex",justifyContent:"space-around"}}>
+                  {weekDays.map((d,i)=>{
+                    const ds     = toStr(d);
+                    const isSel  = ds===selStr;
+                    const isToday= ds===TODAY_S;
+                    const hasTasks = tasks.some(t=>t.date===ds);
+                    return (
+                      <div key={i} onClick={()=>pickDay(d)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",padding:"4px 10px",borderRadius:10,background:isSel?"#F0EEFF":"transparent",transition:"background 0.15s"}}>
+                        <span style={{fontSize:10,fontWeight:600,color:isSel?P:"#CCC",textTransform:"uppercase",letterSpacing:"0.3px"}}>{DAY_SHORT[i]}</span>
+                        <div style={{width:30,height:30,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isSel?P:isToday?"#F0EEFF":"transparent",border:isToday&&!isSel?`2px solid ${P}`:"2px solid transparent"}}>
+                          <span style={{fontSize:13,fontWeight:700,color:isSel?"white":isToday?P:"#555"}}>{d.getDate()}</span>
+                        </div>
+                        <div style={{width:4,height:4,borderRadius:"50%",background:hasTasks?(isSel?"white":P):"transparent"}}/>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button onClick={nextWeek} style={{width:28,height:28,borderRadius:8,border:"none",background:"#F0EEFF",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:P,flexShrink:0}}>
+                  <ChevronRight size={14}/>
+                </button>
+              </div>
+
+              {/* date label */}
+              <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+                <span style={{fontSize:16,fontWeight:700,color:"#1A1A2E"}}>{dateLabel}</span>
+                {pendingCount>0&&<span style={{fontSize:12,color:"#C0BAFF"}}>{pendingCount} tarefa{pendingCount!==1?"s":""} pendente{pendingCount!==1?"s":""}</span>}
+              </div>
+
+              {/* priorities */}
+              <div style={{background:"white",borderRadius:14,padding:"16px 20px",border:"1px solid #F0EEFF"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#C0BAFF",letterSpacing:"0.8px",textTransform:"uppercase",marginBottom:14}}>Prioridades do dia</div>
+                {[0,1,2].map(i=>{
+                  const done  = (priosDone[selStr]||[false,false,false])[i];
+                  const hasText = !!dayPrios[i];
+                  return (
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:12,marginBottom:i<2?12:0}}>
+                      {/* circle: clickable only when has text */}
+                      <div
+                        onClick={()=>hasText && togglePrioDone(i)}
+                        style={{width:22,height:22,borderRadius:"50%",background:hasText?P:"#F0EEFF",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.2s",cursor:hasText?"pointer":"default"}}
+                      >
+                        {done && hasText
+                          ? <Check size={11} color="white" strokeWidth={3.5}/>
+                          : <span style={{fontSize:11,fontWeight:700,color:hasText?"white":"#C0BAFF"}}>{i+1}</span>
+                        }
+                      </div>
+                      <input
+                        value={dayPrios[i]}
+                        onChange={e=>setPrio(i,e.target.value)}
+                        placeholder=""
+                        style={{flex:1,border:"none",outline:"none",fontSize:14,color:done?"#C8C8D8":"#1A1A2E",background:"transparent",borderBottom:"1.5px solid #F0EEFF",paddingBottom:4,textDecoration:done?"line-through":"none",transition:"all 0.2s"}}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* tasks */}
+              <div style={{background:"white",borderRadius:14,padding:"16px 20px",border:"1px solid #F0EEFF",position:"relative"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,gap:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#C0BAFF",letterSpacing:"0.8px",textTransform:"uppercase"}}>Minhas tarefas</div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:"auto"}}>
+
+                    {/* sort button */}
+                    <div style={{position:"relative"}}>
+                      <button
+                        onClick={()=>setShowSort(v=>!v)}
+                        style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:7,border:`1px solid ${sortRules.length>0?P:"#ECEAFB"}`,background:sortRules.length>0?"#F0EEFF":"white",color:sortRules.length>0?P:"#BBB",fontSize:11,fontWeight:600,cursor:"pointer"}}
+                      >
+                        <ChevronsUpDown size={12}/>
+                        {sortRules.length>0?`${sortRules.length} ordenação${sortRules.length>1?"ões":""}` : "Ordenar"}
+                      </button>
+
+                      {showSort&&(
+                        <div style={{position:"absolute",top:"calc(100% + 6px)",right:0,background:"white",borderRadius:12,border:"1px solid #ECEAFB",padding:"14px",width:290,zIndex:50,boxShadow:"0 8px 24px rgba(97,85,232,0.12)"}}>
+                          <div style={{fontSize:11,fontWeight:700,color:"#C0BAFF",letterSpacing:"0.5px",textTransform:"uppercase",marginBottom:10}}>Ordenar por</div>
+
+                          {sortRules.length===0&&(
+                            <div style={{fontSize:13,color:"#DDD",marginBottom:12,textAlign:"center",padding:"4px 0"}}>Sem ordenação ativa</div>
+                          )}
+
+                          {sortRules.map((rule,idx)=>{
+                            const dirLabels = {
+                              category: { asc:"A → Z", desc:"Z → A" },
+                              priority: { asc:"Alta primeiro", desc:"Baixa primeiro" },
+                            };
+                            return (
+                              <div key={idx} style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+                                <select
+                                  value={rule.field}
+                                  onChange={e=>setSortRules(r=>r.map((x,i)=>i===idx?{...x,field:e.target.value}:x))}
+                                  style={{flex:1,padding:"5px 8px",borderRadius:7,border:"1px solid #ECEAFB",background:"#F8F7FF",fontSize:12,color:"#555",cursor:"pointer",outline:"none"}}
+                                >
+                                  <option value="category">Categoria</option>
+                                  <option value="priority">Prioridade</option>
+                                </select>
+                                <select
+                                  value={rule.dir}
+                                  onChange={e=>setSortRules(r=>r.map((x,i)=>i===idx?{...x,dir:e.target.value}:x))}
+                                  style={{flex:1,padding:"5px 8px",borderRadius:7,border:"1px solid #ECEAFB",background:"#F8F7FF",fontSize:12,color:"#555",cursor:"pointer",outline:"none"}}
+                                >
+                                  <option value="asc">{dirLabels[rule.field].asc}</option>
+                                  <option value="desc">{dirLabels[rule.field].desc}</option>
+                                </select>
+                                <button
+                                  onClick={()=>setSortRules(r=>r.filter((_,i)=>i!==idx))}
+                                  style={{width:22,height:22,borderRadius:6,border:"1px solid #ECEAFB",background:"white",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#CCC",flexShrink:0}}
+                                >
+                                  <X size={11}/>
+                                </button>
+                              </div>
+                            );
+                          })}
+
+                          {sortRules.length<2&&(
+                            <button
+                              onClick={()=>setSortRules(r=>[...r,{field:r.some(x=>x.field==="category")?"priority":"category",dir:"asc"}])}
+                              style={{display:"flex",alignItems:"center",gap:5,width:"100%",padding:"6px 8px",borderRadius:7,border:"1px dashed #ECEAFB",background:"transparent",color:P,fontSize:12,fontWeight:600,cursor:"pointer",marginTop:4}}
+                            >
+                              <Plus size={12}/> Adicionar critério
+                            </button>
+                          )}
+
+                          {sortRules.length>0&&(
+                            <button
+                              onClick={()=>setSortRules([])}
+                              style={{display:"flex",alignItems:"center",justifyContent:"center",width:"100%",padding:"5px",borderRadius:7,border:"none",background:"transparent",color:"#CCC",fontSize:11,cursor:"pointer",marginTop:6}}
+                            >
+                              Limpar tudo
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                  <button onClick={()=>setShowAdd(v=>!v)} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:8,border:"none",background:"#F0EEFF",color:P,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                    <Plus size={13}/> Adicionar
+                  </button>
+                </div>
+
+                {/* inline add */}
+                {showAdd&&(
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,padding:"8px 10px",background:"#F7F6FF",borderRadius:10,border:"1px solid #ECEAFB"}}>
+                    <input
+                      autoFocus
+                      value={addTitle}
+                      onChange={e=>setAddTitle(e.target.value)}
+                      onKeyDown={e=>{if(e.key==="Enter")addTask();if(e.key==="Escape"){setShowAdd(false);setAddTitle("");}}}
+                      placeholder="Nome da tarefa... (Enter para salvar)"
+                      style={{flex:1,border:"none",outline:"none",fontSize:14,background:"transparent",color:"#333"}}
+                    />
+                    <button onClick={addTask} style={{padding:"4px 12px",borderRadius:7,border:"none",background:P,color:"white",fontSize:12,fontWeight:600,cursor:"pointer"}}>Salvar</button>
+                    <button onClick={()=>{setShowAdd(false);setAddTitle("");}} style={{padding:"4px 8px",borderRadius:7,border:"1px solid #EEE",background:"white",color:"#AAA",fontSize:12,cursor:"pointer"}}>✕</button>
+                  </div>
+                )}
+
+                {sorted.total===0&&!showAdd&&(
+                  <div style={{textAlign:"center",padding:"28px 0",color:"#DDD",fontSize:13}}>Nenhuma tarefa para este dia · clique em Adicionar</div>
+                )}
+
+                {/* pendentes */}
+                {sorted.pending.map(t=>{
+                  const c  = getCat(t.category);
+                  const pr = PRIOS.find(p=>p.id===t.priority);
+                  return (
+                    <div key={t.id} className="task-row" style={{display:"flex",alignItems:"center",gap:12,padding:"8px 6px",borderRadius:8,transition:"background 0.1s"}}>
+                      <div onClick={()=>toggleDone(t.id)} title="Marcar como feito" style={{width:24,height:24,borderRadius:"50%",flexShrink:0,cursor:"pointer",background:c.color,display:"flex",alignItems:"center",justifyContent:"center",opacity:0.85}}/>
+                      <span onClick={()=>openTask(t)} style={{flex:1,fontSize:14,fontWeight:500,color:"#1A1A2E",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+                      {t.status==="em_andamento"&&<span style={{fontSize:10,fontWeight:600,color:"#D48B10",background:"#FEF3DC",padding:"2px 7px",borderRadius:5,border:"1px solid #D48B1020",flexShrink:0}}>Em andamento</span>}
+                      {pr&&<span style={{fontSize:10,fontWeight:700,color:pr.color,background:`${pr.color}18`,padding:"2px 7px",borderRadius:5,border:`1px solid ${pr.color}20`,flexShrink:0}}>{pr.label}</span>}
+                      {t.tags.length>0&&<span style={{fontSize:10,color:"#C0BAFF",flexShrink:0,maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.tags[0]}</span>}
+                      <button className="del-btn" onClick={()=>delTask(t.id)} style={{width:26,height:26,borderRadius:7,border:"none",background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Trash2 size={13}/></button>
+                    </div>
+                  );
+                })}
+
+                {/* divider */}
+                {sorted.done.length>0&&(
+                  <div style={{display:"flex",alignItems:"center",gap:8,margin:"8px 0 10px"}}>
+                    <div style={{flex:1,height:1,background:"#F0EEFF"}}/>
+                    <span style={{fontSize:10,fontWeight:600,color:"#D8D4F8",letterSpacing:"0.5px"}}>CONCLUÍDAS</span>
+                    <div style={{flex:1,height:1,background:"#F0EEFF"}}/>
+                  </div>
+                )}
+
+                {/* concluídas */}
+                {sorted.done.map(t=>{
+                  const c = getCat(t.category);
+                  return (
+                    <div key={t.id} className="task-row" style={{display:"flex",alignItems:"center",gap:12,padding:"8px 6px",borderRadius:8,transition:"background 0.1s"}}>
+                      <div onClick={()=>toggleDone(t.id)} title="Desmarcar" style={{width:24,height:24,borderRadius:"50%",flexShrink:0,cursor:"pointer",background:c.color,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        <Check size={12} color="white" strokeWidth={3.5}/>
+                      </div>
+                      <span onClick={()=>openTask(t)} style={{flex:1,fontSize:14,fontWeight:500,color:"#C8C8D8",textDecoration:"line-through",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</span>
+                      <button className="del-btn" onClick={()=>delTask(t.id)} style={{width:26,height:26,borderRadius:7,border:"none",background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Trash2 size={13}/></button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── SEMANA ── */}
+          {tab==="Semana"&&(()=>{
+            const wkKey  = toStr(weekDays[0]);
+            const wkP    = wkPrios[wkKey]     || ["","",""];
+            const wkPD   = wkPriosDone[wkKey] || [false,false,false];
+            return (
+              <div style={{flex:1,overflowY:"auto",padding:"20px 28px",display:"flex",flexDirection:"column",gap:16}}>
+
+                {/* week nav — só setas */}
+                <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+                  <button onClick={prevWeek} style={{width:28,height:28,borderRadius:8,border:"none",background:"#F0EEFF",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:P}}><ChevronLeft size={14}/></button>
+                  <span style={{fontSize:15,fontWeight:700,color:"#1A1A2E"}}>
+                    {weekDays[0].getDate()} a {weekDays[6].getDate()} de {MONTHS[weekDays[6].getMonth()]} de {weekDays[6].getFullYear()}
+                  </span>
+                  <button onClick={nextWeek} style={{width:28,height:28,borderRadius:8,border:"none",background:"#F0EEFF",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:P}}><ChevronRight size={14}/></button>
+                </div>
+
+                {/* weekly priorities */}
+                <div style={{background:"white",borderRadius:14,padding:"16px 20px",border:"1px solid #F0EEFF",flexShrink:0}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#C0BAFF",letterSpacing:"0.8px",textTransform:"uppercase",marginBottom:14}}>Prioridades da semana</div>
+                  {[0,1,2].map(i=>{
+                    const done=wkPD[i]; const hasText=!!wkP[i];
+                    return (
+                      <div key={i} style={{display:"flex",alignItems:"center",gap:12,marginBottom:i<2?12:0}}>
+                        <div onClick={()=>hasText&&toggleWkPrioDone(wkKey,i)} style={{width:22,height:22,borderRadius:"50%",background:hasText?P:"#F0EEFF",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.2s",cursor:hasText?"pointer":"default"}}>
+                          {done&&hasText?<Check size={11} color="white" strokeWidth={3.5}/>:<span style={{fontSize:11,fontWeight:700,color:hasText?"white":"#C0BAFF"}}>{i+1}</span>}
+                        </div>
+                        <input value={wkP[i]} onChange={e=>setWkPrio(wkKey,i,e.target.value)} placeholder="" style={{flex:1,border:"none",outline:"none",fontSize:14,color:done?"#C8C8D8":"#1A1A2E",background:"transparent",borderBottom:"1.5px solid #F0EEFF",paddingBottom:4,textDecoration:done?"line-through":"none",transition:"all 0.2s"}}/>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* 7-column task grid */}
+                <div style={{overflowX:"auto",flex:1,minHeight:0}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(160px,1fr))",gap:10,minHeight:360}}>
+                  {weekDays.map((d,i)=>{
+                    const ds       = toStr(d);
+                    const isToday  = ds===TODAY_S;
+                    const pending  = tasks.filter(t=>t.date===ds&&t.status!=="feito");
+                    const doneList = tasks.filter(t=>t.status==="feito"&&(t.dateEnd||t.date)===ds);
+                    const totalPending = pending.length;
+                    return (
+                      <div key={i} style={{background:isToday?"#F7F5FF":"white",borderRadius:14,border:`1px solid ${isToday?P+"44":"#F0EEFF"}`,padding:"12px 10px",display:"flex",flexDirection:"column",minHeight:340}}>
+
+                        {/* column header */}
+                        <div style={{textAlign:"center",marginBottom:10,flexShrink:0}}>
+                          <div style={{fontSize:10,fontWeight:700,color:isToday?P:"#C0BAFF",textTransform:"uppercase",letterSpacing:"0.3px"}}>{DAY_SHORT[i]}</div>
+                          <div style={{width:28,height:28,borderRadius:"50%",background:isToday?P:"transparent",display:"flex",alignItems:"center",justifyContent:"center",margin:"3px auto"}}>
+                            <span style={{fontSize:13,fontWeight:700,color:isToday?"white":"#333"}}>{d.getDate()}</span>
+                          </div>
+                          {(totalPending+doneList.length)>0&&(
+                            <div style={{fontSize:9,fontWeight:600,color:isToday?P:"#C0BAFF",marginTop:2}}>
+                              {totalPending>0&&`${totalPending} tarefa${totalPending!==1?"s":""}`}
+                              {doneList.length>0&&totalPending>0&&" · "}
+                              {doneList.length>0&&`${doneList.length} ✓`}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* tasks */}
+                        <div style={{flex:1,overflow:"hidden"}}>
+                          {pending.slice(0,6).map(t=>{
+                            const c=getCat(t.category);
+                            return (
+                              <div key={t.id} onClick={()=>openTask(t)} style={{background:c.bg,border:`1px solid ${c.color}30`,borderRadius:6,padding:"3px 7px",marginBottom:4,fontSize:11,fontWeight:600,color:c.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}}>
+                                {t.title}
+                              </div>
+                            );
+                          })}
+                          {totalPending>6&&<div style={{fontSize:9,color:"#C0BAFF",fontWeight:600,marginBottom:4}}>+{totalPending-6} mais</div>}
+                        </div>
+
+                        {/* add button */}
+                        <button
+                          onClick={()=>{ pickDay(d); setEt({id:null,title:"",status:"nao_iniciado",date:ds,dateEnd:"",category:"Trabalho",priority:"media",tags:[],link:""}); setIsNew(true); }}
+                          style={{width:"100%",padding:"5px 0",borderRadius:8,border:"1px dashed #ECEAFB",background:"transparent",color:"#D0CBF8",fontSize:11,fontWeight:600,cursor:"pointer",marginTop:6,flexShrink:0}}
+                        >+ add</button>
+                      </div>
+                    );
+                  })}
+                </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* other tabs */}
+          {tab!=="Diário"&&tab!=="Semana"&&(
+            <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:10}}>
+              <div style={{fontSize:36}}>🚧</div>
+              <div style={{fontSize:14,fontWeight:600,color:"#C0BAFF"}}>Em construção</div>
+              <div style={{fontSize:12,color:"#DDD"}}>A view "{tab}" chega em breve</div>
+            </div>
+          )}
+        </main>
+
+        {/* ── MODAL ── */}
+        {et&&(
+          <div onClick={e=>{if(e.target===e.currentTarget)closeM();}} style={{position:"absolute",inset:0,background:"rgba(26,26,46,0.28)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}}>
+            <div style={{background:"white",borderRadius:20,width:500,maxHeight:"88vh",overflowY:"auto",padding:28}}>
+
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+                <input autoFocus value={et.title} onChange={e=>setEt({...et,title:e.target.value})} placeholder="Título da tarefa..." style={{flex:1,fontSize:18,fontWeight:700,color:"#1A1A2E",border:"none",outline:"none",background:"transparent"}}/>
+                <button onClick={closeM} style={{width:28,height:28,borderRadius:8,border:"1px solid #ECEAFB",background:"#F5F5FA",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#888",marginLeft:12,flexShrink:0}}><X size={14}/></button>
+              </div>
+
+              {[
+                {label:"Status",el:(
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {STATUSES.map(s=>(
+                      <div key={s.id} onClick={()=>setEt({...et,status:s.id})} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",background:et.status===s.id?"#F0EEFF":"#F5F5FA",color:et.status===s.id?P:"#888",border:et.status===s.id?`1px solid ${P}44`:"1px solid transparent"}}>
+                        <span style={{width:7,height:7,borderRadius:"50%",background:s.dot,display:"inline-block"}}/>{s.label}
+                      </div>
+                    ))}
+                  </div>
+                )},
+                {label:"Data",el:<input type="date" value={et.date} onChange={e=>setEt({...et,date:e.target.value})} style={{fontSize:13,padding:"4px 8px",borderRadius:8,border:"1px solid #ECEAFB",background:"#F8F7FF",color:"#333"}}/>},
+                {label:"Data de conclusão",el:<input type="date" value={et.dateEnd} onChange={e=>setEt({...et,dateEnd:e.target.value})} style={{fontSize:13,padding:"4px 8px",borderRadius:8,border:"1px solid #ECEAFB",background:"#F8F7FF",color:"#333"}}/>},
+                {label:"Categoria",el:(
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {CATS.map(c=>(
+                      <div key={c.name} onClick={()=>setEt({...et,category:c.name})} style={{padding:"4px 10px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",background:et.category===c.name?c.bg:"#F5F5FA",color:et.category===c.name?c.color:"#888",border:et.category===c.name?`1px solid ${c.color}44`:"1px solid transparent"}}>{c.name}</div>
+                    ))}
+                  </div>
+                )},
+                {label:"Prioridade",el:(
+                  <div style={{display:"flex",gap:6}}>
+                    {PRIOS.map(p=>(
+                      <div key={p.id} onClick={()=>setEt({...et,priority:p.id})} style={{padding:"4px 10px",borderRadius:8,fontSize:12,fontWeight:500,cursor:"pointer",background:et.priority===p.id?`${p.color}18`:"#F5F5FA",color:et.priority===p.id?p.color:"#888",border:et.priority===p.id?`1px solid ${p.color}44`:"1px solid transparent"}}>{p.label}</div>
+                    ))}
+                  </div>
+                )},
+                {label:"Tags",el:<input value={et.tags.join(", ")} onChange={e=>setEt({...et,tags:e.target.value.split(",").map(t=>t.trim()).filter(Boolean)})} placeholder="ex: meta 2026, urgente" style={{fontSize:13,padding:"4px 8px",borderRadius:8,border:"1px solid #ECEAFB",background:"#F8F7FF",color:"#333",width:"100%"}}/>},
+                {label:"Link",el:<input value={et.link} onChange={e=>setEt({...et,link:e.target.value})} placeholder="https://..." style={{fontSize:13,padding:"4px 8px",borderRadius:8,border:"1px solid #ECEAFB",background:"#F8F7FF",color:"#333",width:"100%"}}/>},
+              ].map(f=>(
+                <div key={f.label} style={{display:"flex",alignItems:"flex-start",gap:14,marginBottom:13,paddingBottom:13,borderBottom:"1px solid #F5F3FF"}}>
+                  <span style={{fontSize:12,color:"#BBB",fontWeight:500,minWidth:116,paddingTop:5}}>{f.label}</span>
+                  <div style={{flex:1}}>{f.el}</div>
+                </div>
+              ))}
+
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+                {!isNew&&<button onClick={delModal} style={{padding:"7px 14px",borderRadius:10,border:"1px solid #FFE0DC",background:"#FFF5F4",color:"#E04E3D",fontSize:13,fontWeight:600,cursor:"pointer"}}>Excluir</button>}
+                <div style={{display:"flex",gap:8,marginLeft:"auto"}}>
+                  <button onClick={closeM} style={{padding:"7px 14px",borderRadius:10,border:"1px solid #ECEAFB",background:"white",color:"#888",fontSize:13,fontWeight:500,cursor:"pointer"}}>Cancelar</button>
+                  <button onClick={saveTask} style={{padding:"7px 18px",borderRadius:10,border:"none",background:P,color:"white",fontSize:13,fontWeight:600,cursor:"pointer"}}>{isNew?"Criar tarefa":"Salvar"}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+
+    // ── Mount ────────────────────────────────────────────────────────
+    ReactDOM.createRoot(document.getElementById('root')).render(<Eleva/>);
+  </script>
+</body>
+</html>
