@@ -29,7 +29,6 @@
   <script type="text/babel">
     const { useState, useMemo } = React;
 
-    // ── Lucide icons inline ──────────────────────────────────────────
     const ChevronLeft    = ({size=16,color="currentColor"}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15,18 9,12 15,6"/></svg>
     const ChevronRight   = ({size=16,color="currentColor"}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9,18 15,12 9,6"/></svg>
     const Trash2         = ({size=16,color="currentColor"}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1 2-2h4a2,2 0 0,1 2,2v2"/></svg>
@@ -38,7 +37,6 @@
     const Check          = ({size=16,color="currentColor",strokeWidth=2}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"><polyline points="20,6 9,17 4,12"/></svg>
     const ChevronsUpDown = ({size=16,color="currentColor"}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="7,15 12,20 17,15"/><polyline points="7,9 12,4 17,9"/></svg>
 
-    // ── App ──────────────────────────────────────────────────────────
 
 const CATS = [
   { name:"Trabalho", color:"#6155E8", bg:"#EEEDFE" },
@@ -120,6 +118,7 @@ function Eleva() {
   const [addTitle, setAddTitle] = useState("");
   const [sortRules, setSortRules] = useState([]);
   const [showSort,  setShowSort]  = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const selStr   = toStr(selDate);
   const weekDays = useMemo(() => getWeekDays(wAnchor), [wAnchor]);
@@ -220,16 +219,23 @@ function Eleva() {
       <div style={{display:"flex",height:"100vh",fontFamily:"'Plus Jakarta Sans',sans-serif",background:"#F7F6FF",position:"relative",overflow:"hidden"}}>
 
         {/* ── SIDEBAR ── */}
-        <aside style={{width:196,flexShrink:0,background:"white",borderRight:"1px solid #ECEAFB",display:"flex",flexDirection:"column",padding:"20px 0"}}>
-          <div style={{padding:"0 16px 18px",borderBottom:"1px solid #F0EEFF",marginBottom:12}}>
-            <div style={{fontSize:22,fontWeight:700,color:P,letterSpacing:"-0.5px"}}>✦ eleva</div>
-            <div style={{fontSize:10,color:"#C0BAFF",fontWeight:600,letterSpacing:"0.8px",textTransform:"uppercase",marginTop:2}}>seu espaço pessoal</div>
+        <aside style={{width:sidebarOpen?196:44,flexShrink:0,background:"white",borderRight:"1px solid #ECEAFB",display:"flex",flexDirection:"column",padding:"20px 0",transition:"width 0.2s",overflow:"hidden"}}>
+          <div style={{padding:"0 12px 18px",borderBottom:"1px solid #F0EEFF",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between",minWidth:172}}>
+            {sidebarOpen&&<div><div style={{fontSize:22,fontWeight:700,color:P,letterSpacing:"-0.5px"}}>✦ eleva</div><div style={{fontSize:10,color:"#C0BAFF",fontWeight:600,letterSpacing:"0.8px",textTransform:"uppercase",marginTop:2}}>seu espaço pessoal</div></div>}
+            <button onClick={()=>setSidebarOpen(v=>!v)} style={{width:24,height:24,borderRadius:7,border:"1px solid #ECEAFB",background:"white",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#C0BAFF",flexShrink:0,marginLeft:sidebarOpen?0:"auto",marginRight:sidebarOpen?0:"auto"}}>
+              {sidebarOpen?<ChevronLeft size={13}/>:<ChevronRight size={13}/>}
+            </button>
           </div>
-          {NAV_ITEMS.map(n=>(
+          {sidebarOpen&&NAV_ITEMS.map(n=>(
             <div key={n.id} style={{display:"flex",alignItems:"center",gap:9,padding:"10px 10px 10px 16px",borderRadius:"0 10px 10px 0",marginRight:10,marginBottom:2,background:n.active?"#F0EEFF":"transparent",color:n.active?P:"#AAA",fontWeight:n.active?600:400,fontSize:13,cursor:"pointer"}}>
               <span style={{fontSize:15}}>{n.icon}</span>
               <span style={{flex:1}}>{n.label}</span>
               {n.soon&&<span style={{fontSize:9,background:"#F0EEFF",color:"#C0BAFF",padding:"2px 5px",borderRadius:4,fontWeight:700}}>BREVE</span>}
+            </div>
+          ))}
+          {!sidebarOpen&&NAV_ITEMS.map(n=>(
+            <div key={n.id} title={n.label} style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"10px 0",cursor:"pointer",fontSize:16}}>
+              {n.icon}
             </div>
           ))}
         </aside>
@@ -494,54 +500,80 @@ function Eleva() {
                   })}
                 </div>
 
-                {/* 7-column task grid */}
+                {/* 5 dias + 1 coluna fds */}
                 <div style={{overflowX:"auto",flex:1,minHeight:0}}>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(160px,1fr))",gap:10,minHeight:360}}>
-                  {weekDays.map((d,i)=>{
-                    const ds       = toStr(d);
-                    const isToday  = ds===TODAY_S;
-                    const pending  = tasks.filter(t=>t.date===ds&&t.status!=="feito");
-                    const doneList = tasks.filter(t=>t.status==="feito"&&(t.dateEnd||t.date)===ds);
-                    const totalPending = pending.length;
+                <div style={{display:"grid",gridTemplateColumns:"repeat(5,minmax(130px,1fr)) minmax(130px,1.2fr)",gap:8,minHeight:320}}>
+
+                  {/* Seg–Sex */}
+                  {weekDays.slice(0,5).map((d,i)=>{
+                    const ds      = toStr(d);
+                    const isToday = ds===TODAY_S;
+                    const pending = tasks.filter(t=>t.date===ds&&t.status!=="feito");
+                    const done    = tasks.filter(t=>t.status==="feito"&&(t.dateEnd||t.date)===ds);
                     return (
-                      <div key={i} style={{background:isToday?"#F7F5FF":"white",borderRadius:14,border:`1px solid ${isToday?P+"44":"#F0EEFF"}`,padding:"12px 10px",display:"flex",flexDirection:"column",minHeight:340}}>
-
-                        {/* column header */}
-                        <div style={{textAlign:"center",marginBottom:10,flexShrink:0}}>
-                          <div style={{fontSize:10,fontWeight:700,color:isToday?P:"#C0BAFF",textTransform:"uppercase",letterSpacing:"0.3px"}}>{DAY_SHORT[i]}</div>
-                          <div style={{width:28,height:28,borderRadius:"50%",background:isToday?P:"transparent",display:"flex",alignItems:"center",justifyContent:"center",margin:"3px auto"}}>
-                            <span style={{fontSize:13,fontWeight:700,color:isToday?"white":"#333"}}>{d.getDate()}</span>
+                      <div key={i} style={{background:isToday?"#F7F5FF":"white",borderRadius:12,border:`1px solid ${isToday?P+"44":"#F0EEFF"}`,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+                        <div style={{padding:"8px 8px 6px",borderBottom:"0.5px solid #F5F3FF",flexShrink:0,textAlign:"center"}}>
+                          <div style={{fontSize:9,fontWeight:700,color:isToday?P:"#C0BAFF",textTransform:"uppercase",letterSpacing:"0.3px"}}>{DAY_SHORT[i]}</div>
+                          <div style={{width:24,height:24,borderRadius:"50%",background:isToday?P:"transparent",display:"flex",alignItems:"center",justifyContent:"center",margin:"2px auto 0"}}>
+                            <span style={{fontSize:12,fontWeight:700,color:isToday?"white":"#333"}}>{d.getDate()}</span>
                           </div>
-                          {(totalPending+doneList.length)>0&&(
-                            <div style={{fontSize:9,fontWeight:600,color:isToday?P:"#C0BAFF",marginTop:2}}>
-                              {totalPending>0&&`${totalPending} tarefa${totalPending!==1?"s":""}`}
-                              {doneList.length>0&&totalPending>0&&" · "}
-                              {doneList.length>0&&`${doneList.length} ✓`}
-                            </div>
-                          )}
                         </div>
-
-                        {/* tasks */}
-                        <div style={{flex:1,overflow:"hidden"}}>
-                          {pending.slice(0,6).map(t=>{
+                        <div style={{flex:1,overflowY:"auto",padding:"5px"}}>
+                          {pending.map(t=>{
                             const c=getCat(t.category);
+                            const pr=PRIOS.find(p=>p.id===t.priority);
                             return (
-                              <div key={t.id} onClick={()=>openTask(t)} style={{background:c.bg,border:`1px solid ${c.color}30`,borderRadius:6,padding:"3px 7px",marginBottom:4,fontSize:11,fontWeight:600,color:c.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer"}}>
-                                {t.title}
+                              <div key={t.id} onClick={()=>openTask(t)} style={{background:c.bg,borderLeft:`2px solid ${c.color}`,borderRadius:"0 5px 5px 0",padding:"3px 6px",marginBottom:3,cursor:"pointer"}}>
+                                <div style={{fontSize:10,fontWeight:600,color:c.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
+                                {pr&&<span style={{fontSize:8,fontWeight:700,color:pr.color,background:`${pr.color}18`,padding:"1px 4px",borderRadius:3,display:"inline-block",marginTop:1}}>{pr.label}</span>}
                               </div>
                             );
                           })}
-                          {totalPending>6&&<div style={{fontSize:9,color:"#C0BAFF",fontWeight:600,marginBottom:4}}>+{totalPending-6} mais</div>}
+                          {done.length>0&&<div style={{fontSize:9,color:"#C0BAFF",fontWeight:600,marginTop:2}}>✓ {done.length}</div>}
                         </div>
-
-                        {/* add button */}
-                        <button
-                          onClick={()=>{ pickDay(d); setEt({id:null,title:"",status:"nao_iniciado",date:ds,dateEnd:"",category:"Trabalho",priority:"media",tags:[],link:""}); setIsNew(true); }}
-                          style={{width:"100%",padding:"5px 0",borderRadius:8,border:"1px dashed #ECEAFB",background:"transparent",color:"#D0CBF8",fontSize:11,fontWeight:600,cursor:"pointer",marginTop:6,flexShrink:0}}
-                        >+ add</button>
+                        <div style={{padding:"3px 5px",borderTop:"0.5px solid #F5F3FF",flexShrink:0}}>
+                          <button onClick={()=>{pickDay(d);setEt({id:null,title:"",status:"nao_iniciado",date:ds,dateEnd:"",category:"Trabalho",priority:"media",tags:[],link:""});setIsNew(true);}} style={{width:"100%",padding:"3px 0",borderRadius:5,border:"1px dashed #ECEAFB",background:"transparent",color:"#C0BAFF",fontSize:9,cursor:"pointer"}}>+ add</button>
+                        </div>
                       </div>
                     );
                   })}
+
+                  {/* Sáb + Dom — mesma coluna, sem divisória */}
+                  <div style={{background:"white",borderRadius:12,border:"1px solid #F0EEFF",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+                    {weekDays.slice(5,7).map((d,i)=>{
+                      const ds      = toStr(d);
+                      const isToday = ds===TODAY_S;
+                      const pending = tasks.filter(t=>t.date===ds&&t.status!=="feito");
+                      const done    = tasks.filter(t=>t.status==="feito"&&(t.dateEnd||t.date)===ds);
+                      return (
+                        <div key={i} style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:isToday?"#F7F5FF":"transparent"}}>
+                          <div style={{padding:"5px 8px 4px",borderBottom:"0.5px solid #F5F3FF",flexShrink:0,display:"flex",alignItems:"center",gap:6}}>
+                            <div style={{fontSize:9,fontWeight:700,color:isToday?P:"#C0BAFF",textTransform:"uppercase",letterSpacing:"0.3px"}}>{DAY_SHORT[5+i]}</div>
+                            <div style={{width:20,height:20,borderRadius:"50%",background:isToday?P:"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                              <span style={{fontSize:11,fontWeight:700,color:isToday?"white":"#444"}}>{d.getDate()}</span>
+                            </div>
+                          </div>
+                          <div style={{flex:1,overflowY:"auto",padding:"4px 5px"}}>
+                            {pending.map(t=>{
+                              const c=getCat(t.category);
+                              const pr=PRIOS.find(p=>p.id===t.priority);
+                              return (
+                                <div key={t.id} onClick={()=>openTask(t)} style={{background:c.bg,borderLeft:`2px solid ${c.color}`,borderRadius:"0 5px 5px 0",padding:"3px 6px",marginBottom:3,cursor:"pointer"}}>
+                                  <div style={{fontSize:10,fontWeight:600,color:c.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
+                                  {pr&&<span style={{fontSize:8,fontWeight:700,color:pr.color,background:`${pr.color}18`,padding:"1px 4px",borderRadius:3,display:"inline-block",marginTop:1}}>{pr.label}</span>}
+                                </div>
+                              );
+                            })}
+                            {done.length>0&&<div style={{fontSize:9,color:"#C0BAFF",fontWeight:600,marginTop:2}}>✓ {done.length}</div>}
+                          </div>
+                          <div style={{padding:"3px 5px",borderTop:"0.5px solid #F5F3FF",flexShrink:0}}>
+                            <button onClick={()=>{pickDay(d);setEt({id:null,title:"",status:"nao_iniciado",date:ds,dateEnd:"",category:"Trabalho",priority:"media",tags:[],link:""});setIsNew(true);}} style={{width:"100%",padding:"3px 0",borderRadius:5,border:"1px dashed #ECEAFB",background:"transparent",color:"#C0BAFF",fontSize:9,cursor:"pointer"}}>+ add</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
                 </div>
                 </div>
               </div>
@@ -619,7 +651,6 @@ function Eleva() {
 }
 
 
-    // ── Mount ────────────────────────────────────────────────────────
     ReactDOM.createRoot(document.getElementById('root')).render(<Eleva/>);
   </script>
 </body>
